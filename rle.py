@@ -33,19 +33,30 @@ class RLECompression:
         encoded.append([current_val, count])
         return encoded
 
+    @staticmethod
+    def decode(encoded):
+        pixels = []
+        for value, count in encoded:
+            pixels.extend([value] * count)
+        return pixels
+
+    def get_image(self):
+        decoded_channels = [np.array(self.decode(ch), dtype=np.uint8) for ch in self.encoded_data]
+        img = np.stack([ch.reshape(self.height, self.width) for ch in decoded_channels], axis=-1)
+        return img
+
     def save_to_json(self, path):
-        # JSON single-line, tapi per channel
         payload = {
             "width": self.width,
             "height": self.height,
             "channels": self.channels,
-            "data": self.encoded_data  # sudah per channel
+            "data": self.encoded_data  # per channel, single line
         }
         with open(path, 'w') as f:
-            json.dump(payload, f)  # tanpa indent
+            json.dump(payload, f)
 
 # ============================
-# Contoh penggunaan console
+# MAIN CONSOLE
 # ============================
 if __name__ == "__main__":
     file_path = "myphoto.png"  # ganti sesuai nama file
@@ -56,6 +67,18 @@ if __name__ == "__main__":
     print(f"Ukuran: {compressor.width}x{compressor.height}, Channels: {compressor.channels}")
     print(f"Jumlah channel yang di-RLE: {len(compressor.encoded_data)}")
 
-    # Simpan ke JSON single-line
+    # Preview beberapa pasangan pertama per channel
+    for idx, ch in enumerate(compressor.encoded_data):
+        print(f"\n--- Channel {idx} (RLE preview 20 pasangan pertama) ---")
+        for pair in ch[:20]:
+            print(pair, end=' ')
+        if len(ch) > 20:
+            print(f"... ({len(ch)} pasangan total)")
+
+    # Simpan ke JSON
     compressor.save_to_json("compressed.json")
-    print("RLE per channel disimpan ke compressed.json")
+    print("\nRLE per channel disimpan ke compressed.json")
+
+    # Dekompres dan verifikasi (opsional)
+    decompressed_img = compressor.get_image()
+    print(f"Gambar dekompresi berhasil, shape: {decompressed_img.shape}")
