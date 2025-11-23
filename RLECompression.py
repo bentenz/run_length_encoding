@@ -117,15 +117,10 @@ class RLECompression:
         return base64.b64encode(buffer).decode('utf-8')
 
     def get_compression_stats(self):
-        """
-        Statistik kompresi dengan persentase pengurangan ukuran file
-        """
-        # Ukuran file asli
         self.file.seek(0)
         original_bytes = self.file.read()
         original_size = len(original_bytes)
 
-        # Ukuran JSON RLE
         payload = {
             "width": self.width,
             "height": self.height,
@@ -139,7 +134,6 @@ class RLECompression:
         json_bytes = json.dumps(payload).encode('utf-8')
         json_size = len(json_bytes)
 
-        # Ukuran Binary RLE
         binary_buffer = io.BytesIO()
         binary_buffer.write(struct.pack('<III', self.height, self.width, self.channels))
         for channel in self.encoded_data:
@@ -149,11 +143,9 @@ class RLECompression:
                 binary_buffer.write(struct.pack('<BI', value, count))
         binary_size = len(binary_buffer.getvalue())
 
-        # Hitung persentase pengurangan ukuran
         json_reduction = round((original_size - json_size) / original_size * 100, 2)
         binary_reduction = round((original_size - binary_size) / original_size * 100, 2)
 
-        # Hitung compression ratio juga
         json_ratio = round(original_size / json_size, 2) if json_size > 0 else 0
         binary_ratio = round(original_size / binary_size, 2) if binary_size > 0 else 0
 
@@ -161,10 +153,10 @@ class RLECompression:
             "original_size": original_size,
             "json_size": json_size,
             "binary_size": binary_size,
-            "json_reduction": json_reduction,  # Persentase pengurangan
-            "binary_reduction": binary_reduction,  # Persentase pengurangan
-            "json_ratio": json_ratio,  # Compression ratio
-            "binary_ratio": binary_ratio  # Compression ratio
+            "json_reduction": json_reduction,  
+            "binary_reduction": binary_reduction, 
+            "json_ratio": json_ratio, 
+            "binary_ratio": binary_ratio  
         }
 
         return stats

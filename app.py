@@ -1,93 +1,10 @@
 from flask import Flask, render_template, request, send_file, abort, url_for
-from PIL import Image
 import io
 import json
-import base64
 from RLECompression import RLECompression
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB limit
-
-# ===================== RLE JSON =====================
-def rle_encode_row(row):
-    encoded = []
-    count = 1
-    for i in range(1, len(row)):
-        if row[i] == row[i-1]:
-            count += 1
-        else:
-            encoded.append([row[i-1], count])
-            count = 1
-    encoded.append([row[-1], count])
-    return encoded
-
-def compress_image_rle(image):
-    img = image.convert("L")  # grayscale
-    pixels = list(img.getdata())
-    width, height = img.size
-    rle_data = []
-    index = 0
-    for _ in range(height):
-        row = pixels[index:index+width]
-        rle_row = rle_encode_row(row)
-        rle_data.append(rle_row)
-        index += width
-    return rle_data, width, height
-
-def rle_decode(rle_data, width, height):
-    pixels = []
-    for row in rle_data:
-        for value, count in row:
-            pixels.extend([value]*count)
-    img = Image.new("L", (width, height))
-    img.putdata(pixels)
-    return img
-
-# ===================== RLE BINARY =====================
-def rle_encode_row_binary(row):
-    encoded = bytearray()
-    count = 1
-    for i in range(1, len(row)):
-        if row[i] == row[i-1] and count < 255:
-            count += 1
-        else:
-            encoded.append(row[i-1])
-            encoded.append(count)
-            count = 1
-    encoded.append(row[-1])
-    encoded.append(count)
-    return encoded
-
-def compress_image_rle_binary(image):
-    img = image.convert("L")
-    pixels = list(img.getdata())
-    width, height = img.size
-    rle_bin = bytearray()
-    index = 0
-    for _ in range(height):
-        row = pixels[index:index+width]
-        rle_bin.extend(rle_encode_row_binary(row))
-        index += width
-    return rle_bin, width, height
-
-def rle_decode_binary(rle_bin, width, height):
-    pixels = []
-    for i in range(0, len(rle_bin), 2):
-        value = rle_bin[i]
-        count = rle_bin[i+1]
-        pixels.extend([value]*count)
-    img = Image.new("L", (width, height))
-    img.putdata(pixels)
-    return img
-
-# ===================== UTILITY =====================
-def image_to_base64(img, resize=None):
-    if resize:
-        img = img.resize(resize)
-    buf = io.BytesIO()
-    img.save(buf, format='PNG')
-    buf.seek(0)
-    return base64.b64encode(buf.read()).decode('utf-8')
 
 # ===================== ROUTES =====================
 @app.route('/')
@@ -106,17 +23,8 @@ def compress():
         compressor.save_to_binary('mycompressed.rle')
         compressor.save_to_json('mycompressed.json')
 
-        img = Image.open(file.stream)
     except Exception:
         abort(400, description="File yang diupload bukan gambar yang valid.")
-
-    # --- RLE JSON ---
-    rle_result, width, height = compress_image_rle(img)
-    output_obj = {"width": width, "height": height, "data": rle_result}
-    output_json = json.dumps(output_obj)
-
-    # --- RLE Binary ---
-    rle_bin, _, _ = compress_image_rle_binary(img)
 
     # --- Statistik ukuran ---
     stats = compressor.get_compression_stats()
@@ -132,8 +40,6 @@ def compress():
     original_base64 = compressor.original_to_base64()
     decompressed_base64 = compressor.to_base64()
 
-    # --- Sample 5 baris pixel asli ---
-    # Ambil sample 5 baris pixel asli
     original_pixels = compressor.image.flatten() if compressor.grayscale else compressor.image.reshape(-1, compressor.channels)
     sample_rows_original = []
     for i in range(min(5, compressor.height)):
@@ -145,16 +51,11 @@ def compress():
             row = original_pixels[start:end, :]
             sample_rows_original.append(row.tolist())
 
-   # --- Sample 5 baris RLE ---
+
     sample_rows_rle = []
     encoded = compressor.encoded_data 
     for i in range(len(encoded)):
-        sample_rows_rle.append(encoded[i])  # Ambil 5 baris pertama dari setiap channel
-
-    print(sample_rows_rle[0])
-    with open('encoded.txt', 'w') as f:
-        f.write(str(encoded) + "\n\n") 
-
+        sample_rows_rle.append(encoded[i])  
 
     chart_data = json.dumps([original_size, json_size, binary_size])
 
