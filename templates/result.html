@@ -9,13 +9,13 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
       .color0 {
-        color: #0d6efd;
+        color: #ff0000;
       }
       .color1 {
-        color: #198754;
+        color: #1faa13;
       }
       .color2 {
-        color: #fd7e14;
+        color: #0015ff;
       }
       .color3 {
         color: #6f42c1;
@@ -40,7 +40,7 @@
       <div class="row my-3">
         {% if original_base64 %}
         <div class="col-md-6">
-          <h5>Gambar Asli</h5>
+          <h5>Gambar</h5>
           <img
             src="data:image/png;base64,{{ original_base64 }}"
             class="img-fluid border"
@@ -48,11 +48,11 @@
         </div>
         {% endif %} {% if decompressed_base64 %}
         <div class="col-md-6">
-          <h5>Gambar Dekompressi</h5>
+          <!-- <h5>Gambar Dekompressi</h5>
           <img
-            src="data:image/png;base64,{{ decompressed_base64 }}"
+            src="data:image/png;base64,{{ decompressed_base64 }}"    gamabar dekompresi
             class="img-fluid border"
-          />
+          /> -->
         </div>
         {% endif %}
       </div>
@@ -72,7 +72,7 @@
       </ul>
 
       <div class="alert alert-warning">
-        <strong>Catatan:</strong> Untuk foto/grayscale real-world, RLE bisa
+        <strong>Catatan:</strong>RLE bisa
         lebih besar dari file asli karena pixel jarang sama berturut-turut.
       </div>
 
@@ -107,8 +107,7 @@
       <!-- Penjelasan RLE -->
       <div class="alert alert-info mt-4">
         <strong>Penjelasan:</strong> File RLE berisi pasangan [nilai_pixel,
-        jumlah_kemunculan] tiap baris gambar. Binary lebih compact, JSON lebih
-        mudah dibaca.
+        jumlah_kemunculan] tiap baris gambar.
       </div>
 
       <br />
