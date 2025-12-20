@@ -59,7 +59,7 @@ class RLECompression:
 # MAIN CONSOLE
 # ============================
 if __name__ == "__main__":
-    file_path = "myphoto.png"  # ganti sesuai nama file
+    file_path = "image/PhotoTraces_Free_RAW_Photos_01_Manhattan_Skyline.dng"  # ganti sesuai nama file
     compressor = RLECompression(file_path)
 
     # Info singkat

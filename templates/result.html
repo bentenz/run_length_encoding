@@ -1,139 +1,288 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Hasil Kompresi RLE</title>
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-    />
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-      .color0 {
-        color: #ff0000;
-      }
-      .color1 {
-        color: #1faa13;
-      }
-      .color2 {
-        color: #0015ff;
-      }
-      .color3 {
-        color: #6f42c1;
-      }
-      .color4 {
-        color: #d63384;
-      }
-      pre {
-        background: #f8f9fa;
-        padding: 10px;
-        border: 1px solid #ccc;
-        max-height: 300px;
-        overflow: auto;
-      }
-    </style>
-  </head>
-  <body class="p-4 bg-light">
-    <div class="container">
-      <h2>Hasil Kompresi RLE</h2>
 
-      <!-- Preview Gambar -->
-      <div class="row my-3">
-        {% if original_base64 %}
-        <div class="col-md-6">
-          <h5>Gambar</h5>
-          <img
-            src="data:image/png;base64,{{ original_base64 }}"
-            class="img-fluid border"
-          />
-        </div>
-        {% endif %} {% if decompressed_base64 %}
-        <div class="col-md-6">
-          <!-- <h5>Gambar Dekompressi</h5>
-          <img
-            src="data:image/png;base64,{{ decompressed_base64 }}"    gamabar dekompresi
-            class="img-fluid border"
-          /> -->
-        </div>
-        {% endif %}
+<head>
+  <title>Hasil Kompresi RLE</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .color0 {
+      color: #ff0000;
+    }
+
+    .color1 {
+      color: #1faa13;
+    }
+
+    .color2 {
+      color: #0015ff;
+    }
+
+    .color3 {
+      color: #6f42c1;
+    }
+
+    .color4 {
+      color: #d63384;
+    }
+
+    pre {
+      background: #f8f9fa;
+      padding: 10px;
+      border: 1px solid #ccc;
+      max-height: 300px;
+      overflow: auto;
+    }
+  </style>
+</head>
+
+<body class="p-4 bg-light">
+  <div class="container">
+    <h2>Hasil Kompresi RLE</h2>
+
+    <!-- Preview Gambar -->
+    <div class="row my-3">
+      {% if original_base64 %}
+      <div class="col-md-4">
+        <h5>Gambar Asli</h5>
+        <img src="data:image/png;base64,{{ original_base64 }}" class="img-fluid border" />
       </div>
-
-      <!-- Statistik -->
-      <h5>Statistik Kompresi</h5>
-      <ul>
-        <li>Ukuran Asli: {{ original_size }} bytes</li>
-        <li>
-          RLE JSON: {{ compressed_size_json }} bytes (rasio {{
-          compression_ratio_json }})
-        </li>
-        <li>
-          RLE Binary: {{ compressed_size_bin }} bytes (rasio {{
-          compression_ratio_bin }})
-        </li>
-      </ul>
-
-      <div class="alert alert-warning">
-        <strong>Catatan:</strong>RLE bisa
-        lebih besar dari file asli karena pixel jarang sama berturut-turut.
+      {% endif %}
+      {% if decompressed_base64 %}
+      <div class="col-md-4">
+        <h5>Dekompresi RGB</h5>
+        <img src="data:image/png;base64,{{ decompressed_base64 }}" class="img-fluid border" />
       </div>
-
-      <!-- Chart -->
-      <canvas id="sizeChart" height="100"></canvas>
-
-      <!-- Download File RLE -->
-      <h5 class="mt-4">Download File JSON</h5>
-      <a href="{{ download_url_json }}" class="btn btn-success me-2"
-        >Download .json (JSON)</a
-      >
-      <a href="{{ download_url_bin }}" class="btn btn-primary"
-        >Download .rle (Binary)</a
-      >
-
-      <!-- Sample Pixel Asli -->
-      <h5 class="mt-4">Sample Pixel Asli (5 baris pertama)</h5>
-      <pre>
-{% for row in sample_rows %}
-<span class="color{{ loop.index0 % 5 }}">{{ row | join(', ') }}</span>
-{% endfor %}
-    </pre>
-
-      <!-- Full RLE -->
-      <h5 class="mt-4">Isi RLE</h5>
-      <pre>
-{% for row in rle_result %}
-<span class="color{{ loop.index0 % 5 }}">{{ row }}</span>
-{% endfor %}
-    </pre>
-
-      <!-- Penjelasan RLE -->
-      <div class="alert alert-info mt-4">
-        <strong>Penjelasan:</strong> File RLE berisi pasangan [nilai_pixel,
-        jumlah_kemunculan] tiap baris gambar.
+      {% endif %}
+      {% if grayscale_base64 %}
+      <div class="col-md-4">
+        <h5>Versi Grayscale</h5>
+        <img src="data:image/png;base64,{{ grayscale_base64 }}" class="img-fluid border" />
       </div>
-
-      <br />
-      <a href="/" class="btn btn-secondary">Kembali</a>
+      {% endif %}
     </div>
 
-    <script>
-      const chartData = JSON.parse("{{ chart_data | safe }}");
-      const ctx = document.getElementById("sizeChart").getContext("2d");
-      new Chart(ctx, {
-        type: "bar",
-        data: {
-          labels: ["Asli", "RLE JSON", "RLE Binary"],
-          datasets: [
-            {
-              label: "Ukuran File (bytes)",
-              data: chartData,
-              backgroundColor: ["#0d6efd", "#198754", "#fd7e14"],
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          plugins: { legend: { display: false } },
-        },
-      });
-    </script>
-  </body>
+    <!-- Statistik -->
+    <h5>Statistik Kompresi</h5>
+    <div class="row">
+      <div class="col-md-4">
+        <div class="card text-center mb-3">
+          <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">Ukuran File Asli</h6>
+            <h4 class="card-title">{{ original_size | filesizeformat }}</h4>
+            <small class="text-muted">{{ original_size }} bytes</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card text-center mb-3 border-success">
+          <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">RLE JSON (RGB)</h6>
+            <h4 class="card-title">{{ compressed_size_json | filesizeformat }}</h4>
+            <span class="badge {% if compression_ratio_json > 0 %}bg-success{% else %}bg-danger{% endif %} fs-6">
+              {% if compression_ratio_json > 0 %}↓{% else %}↑{% endif %} {{ compression_ratio_json }}%
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card text-center mb-3 border-primary">
+          <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">RLE Binary (RGB)</h6>
+            <h4 class="card-title">{{ compressed_size_bin | filesizeformat }}</h4>
+            <span class="badge {% if compression_ratio_bin > 0 %}bg-success{% else %}bg-danger{% endif %} fs-6">
+              {% if compression_ratio_bin > 0 %}↓{% else %}↑{% endif %} {{ compression_ratio_bin }}%
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% if gray_json_size > 0 %}
+    <h5>Versi Grayscale</h5>
+    <div class="row">
+      <div class="col-md-6">
+        <div class="card text-center mb-3 border-secondary">
+          <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">RLE JSON (Grayscale)</h6>
+            <h4 class="card-title">{{ gray_json_size | filesizeformat }}</h4>
+            <span class="badge {% if gray_json_reduction > 0 %}bg-success{% else %}bg-danger{% endif %} fs-6">
+              {% if gray_json_reduction > 0 %}↓{% else %}↑{% endif %} {{ gray_json_reduction }}%
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card text-center mb-3 border-dark">
+          <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">RLE Binary (Grayscale)</h6>
+            <h4 class="card-title">{{ gray_binary_size | filesizeformat }}</h4>
+            <span class="badge {% if gray_binary_reduction > 0 %}bg-success{% else %}bg-danger{% endif %} fs-6">
+              {% if gray_binary_reduction > 0 %}↓{% else %}↑{% endif %} {{ gray_binary_reduction }}%
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="alert alert-info">
+      <strong>Info:</strong> Persentase menunjukkan pengecilan ukuran dibandingkan dengan ukuran file asli.
+      <br>Panah ↓ hijau = lebih kecil (bagus), Panah ↑ merah = lebih besar.
+    </div>
+
+    <!-- Chart -->
+    <canvas id="sizeChart" height="100"></canvas>
+
+    <!-- Download File RLE -->
+    <h5 class="mt-4">Download File JSON</h5>
+    <a href="{{ download_url_json }}" class="btn btn-success me-2">Download .json (JSON)</a>
+    <a href="{{ download_url_bin }}" class="btn btn-primary">Download .rle (Binary)</a>
+
+    <!-- Semua Pixel Asli per Channel -->
+    <h5 class="mt-4">Pixel Asli per Channel</h5>
+    <p class="text-muted small">Format: [index]: nilai | Menampilkan {{ sample_blue | length }} pixel per channel (max
+      10000)</p>
+    <div class="row">
+      <div class="col-md-4">
+        <h6 style="color: #0d6efd;">● Blue Channel ({{ sample_blue | length }} pixels)</h6>
+        <div
+          style="max-height: 300px; overflow: auto; font-size: 9px; background: #f8f9fa; padding: 8px; border-radius: 4px;">
+          {% for val in sample_blue %}
+          <span class="badge bg-primary me-1 mb-1" style="font-size: 8px;">{{ loop.index0 }}:{{ val }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="col-md-4">
+        <h6 style="color: #198754;">● Green Channel ({{ sample_green | length }} pixels)</h6>
+        <div
+          style="max-height: 300px; overflow: auto; font-size: 9px; background: #f8f9fa; padding: 8px; border-radius: 4px;">
+          {% for val in sample_green %}
+          <span class="badge bg-success me-1 mb-1" style="font-size: 8px;">{{ loop.index0 }}:{{ val }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="col-md-4">
+        <h6 style="color: #dc3545;">● Red Channel ({{ sample_red | length }} pixels)</h6>
+        <div
+          style="max-height: 300px; overflow: auto; font-size: 9px; background: #f8f9fa; padding: 8px; border-radius: 4px;">
+          {% for val in sample_red %}
+          <span class="badge bg-danger me-1 mb-1" style="font-size: 8px;">{{ loop.index0 }}:{{ val }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- RLE per Channel -->
+    <h5 class="mt-4">Isi RLE per Channel</h5>
+
+    <div class="accordion" id="rleAccordion">
+      <!-- Channel Blue -->
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+            data-bs-target="#collapseBlue">
+            <span style="color: #0d6efd; font-weight: bold;">● Channel Blue (B)</span>
+            <span class="badge bg-secondary ms-2">{{ rle_blue | length }} runs</span>
+          </button>
+        </h2>
+        <div id="collapseBlue" class="accordion-collapse collapse" data-bs-parent="#rleAccordion">
+          <div class="accordion-body">
+            <pre style="max-height: 200px; overflow: auto;">{{ rle_blue }}</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Channel Green -->
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+            data-bs-target="#collapseGreen">
+            <span style="color: #198754; font-weight: bold;">● Channel Green (G)</span>
+            <span class="badge bg-secondary ms-2">{{ rle_green | length }} runs</span>
+          </button>
+        </h2>
+        <div id="collapseGreen" class="accordion-collapse collapse" data-bs-parent="#rleAccordion">
+          <div class="accordion-body">
+            <pre style="max-height: 200px; overflow: auto;">{{ rle_green }}</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Channel Red -->
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+            data-bs-target="#collapseRed">
+            <span style="color: #dc3545; font-weight: bold;">● Channel Red (R)</span>
+            <span class="badge bg-secondary ms-2">{{ rle_red | length }} runs</span>
+          </button>
+        </h2>
+        <div id="collapseRed" class="accordion-collapse collapse" data-bs-parent="#rleAccordion">
+          <div class="accordion-body">
+            <pre style="max-height: 200px; overflow: auto;">{{ rle_red }}</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Grayscale -->
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+            data-bs-target="#collapseGray">
+            <span style="color: #6c757d; font-weight: bold;">● Grayscale</span>
+            <span class="badge bg-secondary ms-2">{{ rle_grayscale | length }} runs</span>
+          </button>
+        </h2>
+        <div id="collapseGray" class="accordion-collapse collapse" data-bs-parent="#rleAccordion">
+          <div class="accordion-body">
+            <pre style="max-height: 200px; overflow: auto;">{{ rle_grayscale }}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Penjelasan RLE -->
+    <div class="alert alert-info mt-4">
+      <strong>Penjelasan:</strong> File RLE berisi pasangan (nilai_pixel, jumlah_kemunculan).
+      Semakin sedikit jumlah runs, semakin efektif kompresi RLE.
+    </div>
+
+    <br />
+    <a href="/" class="btn btn-secondary">Kembali</a>
+  </div>
+
+  <script>
+    const chartData = JSON.parse("{{ chart_data | safe }}");
+    const ctx = document.getElementById("sizeChart").getContext("2d");
+    const labels = ["Asli", "JSON (RGB)", "Binary (RGB)"];
+    const colors = ["#0d6efd", "#198754", "#fd7e14"];
+
+    // Tambahkan grayscale jika ada
+    if (chartData[3] > 0) {
+      labels.push("JSON (Gray)", "Binary (Gray)");
+      colors.push("#6c757d", "#343a40");
+    }
+
+    new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: "Ukuran File (bytes)",
+            data: chartData.filter(d => d > 0),
+            backgroundColor: colors,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+      },
+    });
+  </script>
+</body>
+
 </html>
