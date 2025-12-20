@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-# struct tidak diperlukan lagi - menggunakan int.to_bytes()
 import json
 import io
 import base64
@@ -39,30 +38,21 @@ class RLECompression:
 
     @staticmethod
     def encode(data):
-        """RLE encode menggunakan NumPy untuk performa optimal"""
         if not data:
             return []
         
-        # Konversi ke numpy array jika belum
         arr = np.array(data, dtype=np.uint8)
         n = len(arr)
         
         if n == 0:
             return []
         
-        # Cari posisi dimana nilai berubah
         changes = np.where(arr[1:] != arr[:-1])[0] + 1
-        
-        # Posisi awal setiap run
         starts = np.concatenate([[0], changes])
-        # Posisi akhir setiap run
         ends = np.concatenate([changes, [n]])
-        
-        # Hitung panjang setiap run
         counts = ends - starts
         values = arr[starts]
         
-        # Kembalikan sebagai list of tuples
         return list(zip(values.tolist(), counts.tolist()))
 
     @staticmethod
@@ -73,23 +63,13 @@ class RLECompression:
         return pixels
 
     def save_to_binary(self, output_path):
-        """
-        Format binary teroptimasi (tanpa struct):
-        - Header: height(4) + width(4) + channels(4) + run_count per channel(4 each)
-        - Setiap run: value(1) + count(1 atau 2 bytes)
-          - Jika count <= 254: 2 bytes (value + count)
-          - Jika count > 254: 4 bytes (value + 255 + count_2bytes)
-        """
         with open(output_path, 'wb') as f:
-            # Header
             f.write(self.height.to_bytes(4, 'little'))
             f.write(self.width.to_bytes(4, 'little'))
             f.write(self.channels.to_bytes(4, 'little'))
-            # Run counts per channel
             for channel in self.encoded_data:
                 run_count = sum(1 + (count - 1) // 65535 for _, count in channel)
                 f.write(run_count.to_bytes(4, 'little'))
-            # Data runs
             for channel in self.encoded_data:
                 for value, count in channel:
                     while count > 65535:
@@ -147,7 +127,6 @@ class RLECompression:
         return base64.b64encode(buffer).decode('utf-8')
 
     def grayscale_to_base64(self):
-        """Konversi gambar ke grayscale dan return sebagai base64"""
         if self.grayscale:
             gray_img = self.image
         else:
@@ -156,7 +135,6 @@ class RLECompression:
         return base64.b64encode(buffer).decode('utf-8')
 
     def get_grayscale_encoded(self):
-        """Mendapatkan RLE encoded data untuk versi grayscale"""
         if self.grayscale:
             return self.encoded_data[0]
         else:
@@ -165,12 +143,9 @@ class RLECompression:
             return self.encode(gray_pixels)
 
     def get_compression_stats(self):
-        # Ukuran file asli
         self.file.seek(0)
         original_bytes = self.file.read()
         file_size = len(original_bytes)
-        
-        # Ukuran raw pixel data (untuk referensi)
         raw_size = self.height * self.width * self.channels
 
         payload = {
@@ -204,33 +179,28 @@ class RLECompression:
                     binary_buffer.write(bytes([value, 255]) + count.to_bytes(2, 'little'))
         binary_size = len(binary_buffer.getvalue())
 
-        # Menggunakan file_size sebagai baseline perbandingan
         json_reduction = round((file_size - json_size) / file_size * 100, 2)
         binary_reduction = round((file_size - binary_size) / file_size * 100, 2)
-
         json_ratio = round(file_size / json_size, 2) if json_size > 0 else 0
         binary_ratio = round(file_size / binary_size, 2) if binary_size > 0 else 0
 
         stats = {
-            "original_size": file_size,   # Ukuran file asli
-            "file_size": file_size,       # Ukuran file asli
-            "raw_size": raw_size,         # Ukuran raw pixel
+            "original_size": file_size,
+            "file_size": file_size,
+            "raw_size": raw_size,
             "json_size": json_size,
             "binary_size": binary_size,
-            "json_reduction": json_reduction,  
-            "binary_reduction": binary_reduction, 
-            "json_ratio": json_ratio, 
-            "binary_ratio": binary_ratio  
+            "json_reduction": json_reduction,
+            "binary_reduction": binary_reduction,
+            "json_ratio": json_ratio,
+            "binary_ratio": binary_ratio
         }
 
-        # Hitung statistik grayscale jika gambar asli bukan grayscale
         if not self.grayscale:
-            # Konversi ke grayscale dan encode
             gray_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
             gray_pixels = gray_image.flatten().tolist()
             gray_encoded = self.encode(gray_pixels)
             
-            # Hitung ukuran JSON grayscale
             gray_payload = {
                 "width": self.width,
                 "height": self.height,
@@ -240,7 +210,6 @@ class RLECompression:
             }
             gray_json_size = len(json.dumps(gray_payload).encode('utf-8'))
             
-            # Hitung ukuran binary grayscale
             gray_binary_buffer = io.BytesIO()
             gray_binary_buffer.write(self.height.to_bytes(4, 'little'))
             gray_binary_buffer.write(self.width.to_bytes(4, 'little'))
@@ -257,7 +226,6 @@ class RLECompression:
                     gray_binary_buffer.write(bytes([value, 255]) + count.to_bytes(2, 'little'))
             gray_binary_size = len(gray_binary_buffer.getvalue())
             
-            # Statistik grayscale - gunakan file_size sebagai baseline
             stats["gray_json_size"] = gray_json_size
             stats["gray_binary_size"] = gray_binary_size
             stats["gray_json_reduction"] = round((file_size - gray_json_size) / file_size * 100, 2)
