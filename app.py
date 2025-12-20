@@ -4,9 +4,8 @@ import json
 from RLECompression import RLECompression
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB limit
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 
-# ===================== ROUTES =====================
 @app.route('/')
 def index():
     return render_template("index.html")
@@ -22,60 +21,71 @@ def compress():
         compressor = RLECompression(file.stream)
         compressor.save_to_binary('mycompressed.rle')
         compressor.save_to_json('mycompressed.json')
-
     except Exception:
         abort(400, description="File yang diupload bukan gambar yang valid.")
 
-    # --- Statistik ukuran ---
     stats = compressor.get_compression_stats()
-
-       # Sekarang Anda bisa akses:
     original_size = stats['original_size']
     json_size = stats['json_size']
     binary_size = stats['binary_size']
-    json_ratio = stats['json_ratio']  # Compression ratio JSON
+    json_ratio = stats['json_ratio']
     binary_ratio = stats['binary_ratio']
+    json_reduction = stats['json_reduction']
+    binary_reduction = stats['binary_reduction']
+    gray_json_size = stats.get('gray_json_size', 0)
+    gray_binary_size = stats.get('gray_binary_size', 0)
+    gray_json_reduction = stats.get('gray_json_reduction', 0)
+    gray_binary_reduction = stats.get('gray_binary_reduction', 0)
 
-    # --- Preview gambar ---
     original_base64 = compressor.original_to_base64()
     decompressed_base64 = compressor.to_base64()
+    grayscale_base64 = compressor.grayscale_to_base64()
 
-    original_pixels = compressor.image.flatten() if compressor.grayscale else compressor.image.reshape(-1, compressor.channels)
-    sample_rows_original = []
-    for i in range(min(5, compressor.height)):
-        start = i * compressor.width
-        end = start + compressor.width
-        if compressor.grayscale:
-            sample_rows_original.append(original_pixels[start:end].tolist())
-        else:
-            row = original_pixels[start:end, :]
-            sample_rows_original.append(row.tolist())
+    max_pixels = 10000
+    if compressor.grayscale:
+        sample_blue = compressor.image.flatten()[:max_pixels].tolist()
+        sample_green = []
+        sample_red = []
+    else:
+        sample_blue = compressor.image[:, :, 0].flatten()[:max_pixels].tolist()
+        sample_green = compressor.image[:, :, 1].flatten()[:max_pixels].tolist()
+        sample_red = compressor.image[:, :, 2].flatten()[:max_pixels].tolist()
 
+    rle_blue = compressor.encoded_data[0] if len(compressor.encoded_data) > 0 else []
+    rle_green = compressor.encoded_data[1] if len(compressor.encoded_data) > 1 else []
+    rle_red = compressor.encoded_data[2] if len(compressor.encoded_data) > 2 else []
+    rle_grayscale = compressor.get_grayscale_encoded()
 
-    sample_rows_rle = []
-    encoded = compressor.encoded_data 
-    for i in range(len(encoded)):
-        sample_rows_rle.append(encoded[i])  
-
-    chart_data = json.dumps([original_size, json_size, binary_size])
+    chart_data = json.dumps([original_size, json_size, binary_size, gray_json_size, gray_binary_size])
 
     return render_template(
         "result.html",
         original_base64=original_base64,
         decompressed_base64=decompressed_base64,
+        grayscale_base64=grayscale_base64,
         original_size=original_size,
         compressed_size_json=json_size,
         compressed_size_bin=binary_size,
-        compression_ratio_json=json_ratio,
-        compression_ratio_bin=binary_ratio,
+        compression_ratio_json=json_reduction,
+        compression_ratio_bin=binary_reduction,
+        gray_json_size=gray_json_size,
+        gray_binary_size=gray_binary_size,
+        gray_json_reduction=gray_json_reduction,
+        gray_binary_reduction=gray_binary_reduction,
+        width=compressor.width,
+        height=compressor.height,
         download_url_json=url_for('download_rle'),
         download_url_bin=url_for('download_rlebin'),
         chart_data=chart_data,
-        rle_result=sample_rows_rle,
-        sample_rows=sample_rows_original
+        rle_blue=rle_blue,
+        rle_green=rle_green,
+        rle_red=rle_red,
+        rle_grayscale=rle_grayscale,
+        sample_blue=sample_blue,
+        sample_green=sample_green,
+        sample_red=sample_red
     )
 
-# ===================== DOWNLOAD ROUTES =====================
 @app.route('/download')
 def download_rle():
     try:
@@ -90,6 +100,5 @@ def download_rlebin():
     except Exception:
         abort(404, description="File RLE Binary belum tersedia.")
 
-# ===================== MAIN =====================
 if __name__ == "__main__":
     app.run(debug=True)

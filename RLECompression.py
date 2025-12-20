@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-import struct
 import json
 import io
 import base64
@@ -41,18 +40,20 @@ class RLECompression:
     def encode(data):
         if not data:
             return []
-        encoded = []
-        current_val = data[0]
-        count = 1
-        for i in range(1, len(data)):
-            if data[i] == current_val:
-                count += 1
-            else:
-                encoded.append((current_val, count))
-                current_val = data[i]
-                count = 1
-        encoded.append((current_val, count))
-        return encoded
+        
+        arr = np.array(data, dtype=np.uint8)
+        n = len(arr)
+        
+        if n == 0:
+            return []
+        
+        changes = np.where(arr[1:] != arr[:-1])[0] + 1
+        starts = np.concatenate([[0], changes])
+        ends = np.concatenate([changes, [n]])
+        counts = ends - starts
+        values = arr[starts]
+        
+        return list(zip(values.tolist(), counts.tolist()))
 
     @staticmethod
     def decode(encoded):
@@ -63,12 +64,21 @@ class RLECompression:
 
     def save_to_binary(self, output_path):
         with open(output_path, 'wb') as f:
-            f.write(struct.pack('<III', self.height, self.width, self.channels))
+            f.write(self.height.to_bytes(4, 'little'))
+            f.write(self.width.to_bytes(4, 'little'))
+            f.write(self.channels.to_bytes(4, 'little'))
             for channel in self.encoded_data:
-                f.write(struct.pack('<I', len(channel)))
+                run_count = sum(1 + (count - 1) // 65535 for _, count in channel)
+                f.write(run_count.to_bytes(4, 'little'))
             for channel in self.encoded_data:
                 for value, count in channel:
-                    f.write(struct.pack('<BI', value, count))
+                    while count > 65535:
+                        f.write(bytes([value, 255]) + (65535).to_bytes(2, 'little'))
+                        count -= 65535
+                    if count <= 254:
+                        f.write(bytes([value, count]))
+                    else:
+                        f.write(bytes([value, 255]) + count.to_bytes(2, 'little'))
 
     def save_to_json(self, output_path):
         payload = {
@@ -116,10 +126,27 @@ class RLECompression:
         _, buffer = cv2.imencode('.png', img)
         return base64.b64encode(buffer).decode('utf-8')
 
+    def grayscale_to_base64(self):
+        if self.grayscale:
+            gray_img = self.image
+        else:
+            gray_img = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        _, buffer = cv2.imencode('.png', gray_img)
+        return base64.b64encode(buffer).decode('utf-8')
+
+    def get_grayscale_encoded(self):
+        if self.grayscale:
+            return self.encoded_data[0]
+        else:
+            gray_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+            gray_pixels = gray_image.flatten().tolist()
+            return self.encode(gray_pixels)
+
     def get_compression_stats(self):
         self.file.seek(0)
         original_bytes = self.file.read()
-        original_size = len(original_bytes)
+        file_size = len(original_bytes)
+        raw_size = self.height * self.width * self.channels
 
         payload = {
             "width": self.width,
@@ -135,28 +162,73 @@ class RLECompression:
         json_size = len(json_bytes)
 
         binary_buffer = io.BytesIO()
-        binary_buffer.write(struct.pack('<III', self.height, self.width, self.channels))
+        binary_buffer.write(self.height.to_bytes(4, 'little'))
+        binary_buffer.write(self.width.to_bytes(4, 'little'))
+        binary_buffer.write(self.channels.to_bytes(4, 'little'))
         for channel in self.encoded_data:
-            binary_buffer.write(struct.pack('<I', len(channel)))
+            run_count = sum(1 + (count - 1) // 65535 for _, count in channel)
+            binary_buffer.write(run_count.to_bytes(4, 'little'))
         for channel in self.encoded_data:
             for value, count in channel:
-                binary_buffer.write(struct.pack('<BI', value, count))
+                while count > 65535:
+                    binary_buffer.write(bytes([value, 255]) + (65535).to_bytes(2, 'little'))
+                    count -= 65535
+                if count <= 254:
+                    binary_buffer.write(bytes([value, count]))
+                else:
+                    binary_buffer.write(bytes([value, 255]) + count.to_bytes(2, 'little'))
         binary_size = len(binary_buffer.getvalue())
 
-        json_reduction = round((original_size - json_size) / original_size * 100, 2)
-        binary_reduction = round((original_size - binary_size) / original_size * 100, 2)
-
-        json_ratio = round(original_size / json_size, 2) if json_size > 0 else 0
-        binary_ratio = round(original_size / binary_size, 2) if binary_size > 0 else 0
+        json_reduction = round((file_size - json_size) / file_size * 100, 2)
+        binary_reduction = round((file_size - binary_size) / file_size * 100, 2)
+        json_ratio = round(file_size / json_size, 2) if json_size > 0 else 0
+        binary_ratio = round(file_size / binary_size, 2) if binary_size > 0 else 0
 
         stats = {
-            "original_size": original_size,
+            "original_size": file_size,
+            "file_size": file_size,
+            "raw_size": raw_size,
             "json_size": json_size,
             "binary_size": binary_size,
-            "json_reduction": json_reduction,  
-            "binary_reduction": binary_reduction, 
-            "json_ratio": json_ratio, 
-            "binary_ratio": binary_ratio  
+            "json_reduction": json_reduction,
+            "binary_reduction": binary_reduction,
+            "json_ratio": json_ratio,
+            "binary_ratio": binary_ratio
         }
+
+        if not self.grayscale:
+            gray_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+            gray_pixels = gray_image.flatten().tolist()
+            gray_encoded = self.encode(gray_pixels)
+            
+            gray_payload = {
+                "width": self.width,
+                "height": self.height,
+                "channels": 1,
+                "grayscale": True,
+                "data": [[[v, c] for (v, c) in gray_encoded]]
+            }
+            gray_json_size = len(json.dumps(gray_payload).encode('utf-8'))
+            
+            gray_binary_buffer = io.BytesIO()
+            gray_binary_buffer.write(self.height.to_bytes(4, 'little'))
+            gray_binary_buffer.write(self.width.to_bytes(4, 'little'))
+            gray_binary_buffer.write((1).to_bytes(4, 'little'))
+            run_count = sum(1 + (count - 1) // 65535 for _, count in gray_encoded)
+            gray_binary_buffer.write(run_count.to_bytes(4, 'little'))
+            for value, count in gray_encoded:
+                while count > 65535:
+                    gray_binary_buffer.write(bytes([value, 255]) + (65535).to_bytes(2, 'little'))
+                    count -= 65535
+                if count <= 254:
+                    gray_binary_buffer.write(bytes([value, count]))
+                else:
+                    gray_binary_buffer.write(bytes([value, 255]) + count.to_bytes(2, 'little'))
+            gray_binary_size = len(gray_binary_buffer.getvalue())
+            
+            stats["gray_json_size"] = gray_json_size
+            stats["gray_binary_size"] = gray_binary_size
+            stats["gray_json_reduction"] = round((file_size - gray_json_size) / file_size * 100, 2)
+            stats["gray_binary_reduction"] = round((file_size - gray_binary_size) / file_size * 100, 2)
 
         return stats
